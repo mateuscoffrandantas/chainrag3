@@ -114,15 +114,11 @@ if run_button and file_input and openaikey and prompt:
         # Configurar a chave de API do OpenAI
         os.environ["OPENAI_API_KEY"] = openaikey
 
-        # Verificar se a chave de API é válida
         try:
-            # Testar a chave de API com uma chamada simples
-            embeddings = OpenAIEmbeddings()
-            embeddings.embed_documents(["test"])
-        except AuthenticationError as e:
-            st.error(f"Invalid OpenAI API Key: {e}")
-        else:
-            # Executar a função de perguntas e respostas
+            # Executar a função de perguntas e respostas diretamente
             result = qa(temp_file_path, file_input.type, prompt, select_chain_type, select_k)
             # Exibir o resultado
+            display_result(result)
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
             display_result(result)
