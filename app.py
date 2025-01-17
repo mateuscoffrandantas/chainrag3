@@ -9,7 +9,7 @@ from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import PyPDFLoader, TextLoader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
+from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
 from pypdf.errors import PdfReadError
 from openai.error import AuthenticationError, InvalidRequestError
@@ -62,11 +62,19 @@ def qa(file_path, file_type, query, chain_type, k):
             return None
         
         # split the documents into chunks
-        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+        text_splitter = CharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=0,
+            separator="\n"
+        )
         texts = text_splitter.split_documents(documents)
         
         # select which embeddings we want to use
-        embeddings = OpenAIEmbeddings()
+        embeddings = OpenAIEmbeddings(
+            model="text-embedding-ada-002",  # Especificar o modelo explicitamente
+            openai_api_key=os.getenv("OPENAI_API_KEY"),
+            chunk_size=1  # Reduzir o tamanho do chunk para processamento mais leve
+        )
         
         # create the vectorestore to use as the index
         db = Chroma.from_documents(texts, embeddings)
@@ -76,7 +84,11 @@ def qa(file_path, file_type, query, chain_type, k):
         
         # create a chain to answer questions 
         qa = RetrievalQA.from_chain_type(
-            llm=ChatOpenAI(model="gpt-4"), 
+            llm=ChatOpenAI(
+                model="gpt-4",
+                temperature=0,  # Reduzir temperatura para respostas mais consistentes
+                openai_api_key=os.getenv("OPENAI_API_KEY")
+            ),
             chain_type=chain_type, 
             retriever=retriever, 
             return_source_documents=True
@@ -91,6 +103,9 @@ def qa(file_path, file_type, query, chain_type, k):
         return None
     except InvalidRequestError as e:
         st.error(f"Invalid request error: {e}")
+        return None
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
         return None
 
 # Função para exibir o resultado no Streamlit
@@ -121,4 +136,3 @@ if run_button and file_input and openaikey and prompt:
             display_result(result)
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
-            display_result(result)
