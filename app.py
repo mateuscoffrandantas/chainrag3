@@ -5,6 +5,7 @@ import pytesseract
 from PIL import Image
 import docx
 import streamlit as st
+import tiktoken
 from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import PyPDFLoader, TextLoader
@@ -64,16 +65,17 @@ def qa(file_path, file_type, query, chain_type, k):
         # split the documents into chunks
         text_splitter = CharacterTextSplitter(
             chunk_size=1000,
-            chunk_overlap=0,
+            chunk_overlap=200,
+            length_function=len,
             separator="\n"
         )
         texts = text_splitter.split_documents(documents)
         
         # select which embeddings we want to use
         embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002",  # Especificar o modelo explicitamente
+            model="text-embedding-ada-002",
             openai_api_key=os.getenv("OPENAI_API_KEY"),
-            chunk_size=1  # Reduzir o tamanho do chunk para processamento mais leve
+            tiktoken_model_name="cl100k_base"  # Especificar o modelo de tiktoken
         )
         
         # create the vectorestore to use as the index
@@ -86,7 +88,7 @@ def qa(file_path, file_type, query, chain_type, k):
         qa = RetrievalQA.from_chain_type(
             llm=ChatOpenAI(
                 model="gpt-4",
-                temperature=0,  # Reduzir temperatura para respostas mais consistentes
+                temperature=0,
                 openai_api_key=os.getenv("OPENAI_API_KEY")
             ),
             chain_type=chain_type, 
@@ -95,15 +97,6 @@ def qa(file_path, file_type, query, chain_type, k):
         )
         result = qa({"query": query})
         return result
-    except PdfReadError as e:
-        st.error(f"Error reading PDF file: {e}")
-        return None
-    except AuthenticationError as e:
-        st.error(f"Authentication error: {e}")
-        return None
-    except InvalidRequestError as e:
-        st.error(f"Invalid request error: {e}")
-        return None
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
         return None
@@ -130,7 +123,10 @@ if run_button and file_input and openaikey and prompt:
         os.environ["OPENAI_API_KEY"] = openaikey
 
         try:
-            # Executar a função de perguntas e respostas diretamente
+            # Verificar se o tiktoken está disponível
+            encoding = tiktoken.get_encoding("cl100k_base")
+            
+            # Executar a função de perguntas e respostas
             result = qa(temp_file_path, file_input.type, prompt, select_chain_type, select_k)
             # Exibir o resultado
             display_result(result)
